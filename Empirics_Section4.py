@@ -9,7 +9,7 @@
 # ==================================================#
 # Researchers are free to use the code.
 # Please cite the following paper:
-# Juan-Juan Cai, Yicong Lin, Julia Schaumburg and Chenhui Wang (2026).Estimation and inference for the persistence of extreme high temperatures.
+# Juan-Juan Cai, Yicong Lin, Julia Schaumburg and Chenhui Wang (2026).Estimation and inference for the persistence of extremely high temperatures.
 
 # Purpose: applying our methods to the empirical case in Section 4, daily maximum apparent temperature in Europe.
 ######################################################
