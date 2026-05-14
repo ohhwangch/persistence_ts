@@ -9,7 +9,7 @@
 # ==================================================#
 # Researchers are free to use the code.
 # Please cite the following paper:
-# Juan-Juan Cai, Yicong Lin, Julia Schaumburg and Chenhui Wang (2026).Estimation and inference for the persistence of extremely high temperatures.
+# Juan-Juan Cai, Yicong Lin, Julia Schaumburg and Chenhui Wang (2026).Estimation and inference for the persistence of extreme high temperatures.
 
 # Purpose: applying our methods to the empirical case in Section 4, daily maximum apparent temperature in Europe.
 ######################################################
@@ -27,6 +27,8 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from statsmodels.tsa.stattools import adfuller
 from matplotlib.lines import Line2D
+import matplotlib.ticker as mticker
+import math
 
 ### ======= Download Data Using the API and Cleaning (if not needed, just ignore this part),=======
 ### =======     the output file is named 9a1c0d2016f3a9a4e17cf03ed0e94f37.grib              =======
@@ -679,6 +681,68 @@ def fAdf_test(df: pd.DataFrame, ndays: int = 35 * 92) -> pd.DataFrame:
                 })
     return pd.DataFrame(rows)  #####
 
+### empirical diagnostic for Condition D(u_n) ###
+def dun_delta(series, kn, max_lag=30, block_size=5):
+    """
+    Empirical diagnostic for Condition D(u_n).
+
+    Parameters
+    ----------
+    series : pandas Series
+        Observed time series X_t.
+    kn : float
+        Tail probability. For example, kn=0.05 gives u_n as the 95% quantile.
+    max_lag : int
+        Maximum separation h.
+    block_size : int
+        Length of each block used to approximate max_{1 <= t <= q} U_t <= u_n.
+
+    Returns
+    -------
+    lags : np.ndarray
+        h = 1, ..., max_lag.
+    delta : np.ndarray
+        Absolute probability difference at each h.
+    u_n : float
+        Empirical threshold.
+    """
+
+    arr = series.dropna().to_numpy()
+    n = len(arr)
+
+    # High threshold u_n
+    u_n = np.quantile(arr, 1 - kn)
+
+    lags = np.arange(1, max_lag + 1)
+    delta = np.full(max_lag, np.nan)
+
+    for h in lags:
+        # Need two blocks of length block_size separated by h
+        # left block:  X[t : t + block_size]
+        # right block: X[t + block_size + h : t + 2*block_size + h]
+        n_windows = n - (2 * block_size + h) + 1
+
+        if n_windows <= 0:
+            continue
+
+        A = np.zeros(n_windows, dtype=bool)
+        B = np.zeros(n_windows, dtype=bool)
+
+        for t in range(n_windows):
+            left_block = arr[t : t + block_size]
+            right_block = arr[t + block_size + h : t + 2 * block_size + h]
+
+            A[t] = np.max(left_block) <= u_n
+            B[t] = np.max(right_block) <= u_n
+
+        p_A = A.mean()
+        p_B = B.mean()
+        p_AB = (A & B).mean()
+
+        delta[h - 1] = abs(p_AB - p_A * p_B)
+
+    return lags, delta, u_n
+
 ###
 ### ================ Confidence Intervals ================
 ###
@@ -1014,7 +1078,7 @@ def fPlotTS(df, city,legend = False, save=False):
         print(f"Figure saved to {path}")
     plt.show()
 
-### Figure 3 ###
+### Figure 3, Figure S.4 ###
 def fSelectdL(df_all, city, d=np.arange(2, 21), k=np.arange(65, 258), save=False, legend=True):
     df_city = df_all[df_all["city"] == city].copy()
     data_full = df_city["tappmax"].values
@@ -1219,7 +1283,197 @@ def fPlotFig4(df_thetaci, df_Sci, save = False):
         plt.savefig(f"{folder}/CI_5percent97_tht10_S10.png", dpi=300, bbox_inches="tight")
     plt.show()
 
-### Figure S.4 ###
+### Figure S.3 ###
+def plot_dun(df, City,save=False):
+    MAX_LAG = 30
+    BLOCK_SIZE = 5
+    # ── sub-period data frames ────────────────────────────────────────────
+    df["date"] = pd.to_datetime(df["date"])
+    df["year"]  = df["date"].dt.year
+    df["month"] = df["date"].dt.month
+    df_p1 = df[(df['year'] >= 1940) & (df['year'] <= 1974)]
+    df_p2 = df[(df['year'] >= 1991) & (df['year'] <= 2025)]
+    PERIODS = {'1940–1974': df_p1, '1991–2025': df_p2}
+    CITY_ORDER    =City
+
+    KN_VALUES     = [0.03, 0.05, 0.07]  
+    # ── visual constants ──────────────────────────────────────────────────
+    palette = sns.color_palette("Dark2", n_colors=3)
+    KN_COLORS = {kn: palette[i] for i, kn in enumerate(KN_VALUES)}
+    KN_LS     = {0.03: '-',       0.05: '--',       0.07: ':'}
+    KN_LABEL  = {0.03: r'$k/n=3\%$', 0.05: r'$k/n=5\%$',
+                 0.07: r'$k/n=7\%$'}
+    # -------------------------------------------------------------------
+    # Compute results
+    # -------------------------------------------------------------------
+    results = {}
+    for city in CITY_ORDER:
+        results[city] = {}
+        for pname, pdf in PERIODS.items():
+            results[city][pname] = {}
+            sub = pdf.loc[pdf["city"] == city, "tappmax"].dropna().reset_index(drop=True)
+    
+            for kn in KN_VALUES:
+                lags, delta, u_n = dun_delta(
+                    sub,
+                    kn,
+                    max_lag=MAX_LAG,
+                    block_size=BLOCK_SIZE
+                )
+    
+                results[city][pname][kn] = {
+                    "lags": lags,
+                    "delta": delta,
+                    "u_n": u_n
+                }
+    
+    period_names = list(PERIODS.keys())
+    assert len(period_names) == 2, "This layout is designed for exactly 2 periods."
+    
+    p1, p2 = period_names[0], period_names[1]
+    # -------------------------------------------------------------------
+    # Layout: 3 city columns, each city has 2 stacked panels
+    # -------------------------------------------------------------------
+    ncols_city = 3
+    n_city = len(CITY_ORDER)
+    nrows_city = math.ceil(n_city / ncols_city)
+    
+    # common y-limit
+    global_ymax = 0
+    for city in CITY_ORDER:
+        for pname in period_names:
+            for kn in KN_VALUES:
+                global_ymax = max(global_ymax, np.max(results[city][pname][kn]["delta"]))
+    
+    global_ymax = max(0.055, global_ymax * 1.05)
+    
+    fig = plt.figure(figsize=(18, 5.2 * nrows_city), dpi=200)
+    outer = fig.add_gridspec(
+        nrows=nrows_city,
+        ncols=ncols_city,
+        wspace=0.20,
+        hspace=0.28
+    )
+    
+    for idx, city in enumerate(CITY_ORDER):
+        r = idx // ncols_city
+        c = idx % ncols_city
+    
+        inner = outer[r, c].subgridspec(2, 1, hspace=0.50)
+    
+        ax_top = fig.add_subplot(inner[0, 0])
+        ax_bot = fig.add_subplot(inner[1, 0], sharex=ax_top, sharey=ax_top)
+    
+        # ----------------------------
+        # TOP PANEL: p1
+        # ----------------------------
+        for i, kn in enumerate(KN_VALUES):
+            rr = results[city][p1][kn]
+            lw = 4.0 if i == 0 else 2.0
+            ax_top.plot(
+                rr["lags"],
+                rr["delta"],
+                color=KN_COLORS[kn],
+                lw=lw,
+                ls=KN_LS[kn],
+                label=KN_LABEL[kn]
+            )
+    
+        # ----------------------------
+        # BOTTOM PANEL: p2
+        # ----------------------------
+        for i, kn in enumerate(KN_VALUES):
+            rr = results[city][p2][kn]
+            lw = 4.0 if i == 0 else 2.0
+            ax_bot.plot(
+                rr["lags"],
+                rr["delta"],
+                color=KN_COLORS[kn],
+                lw=lw,
+                ls=KN_LS[kn]
+            )
+        # ----------------------------
+        # Common styling
+        # ----------------------------
+        for ax in (ax_top, ax_bot):
+            ax.set_xlim(0.5, MAX_LAG + 0.5)
+            ax.set_ylim(0, global_ymax)
+            ax.set_xticks([1, 5, 10, 15, 20, 25, 30])
+    
+            # only requested y-ticks
+            ax.yaxis.set_major_locator(mticker.FixedLocator([0.01, 0.03, 0.05]))
+            ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
+    
+            ax.tick_params(axis="both", labelsize=16)
+            ax.grid(True, alpha=0.25)
+    
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+    
+        # hide x tick labels on top panel
+        plt.setp(ax_top.get_xticklabels(), visible=False)
+    
+        # year labels only
+        ax_top.set_title(p1, fontsize=18, pad=6)
+        ax_bot.set_title(p2, fontsize=18, pad=6)
+    
+        # city title once per block, above top panel
+        ax_top.text(
+            0.5, 1.18, city,
+            transform=ax_top.transAxes,
+            ha="center", va="bottom",
+            fontsize=22, fontweight="normal"
+        )
+    
+        # y-label only on first column
+        if c == 0:
+            ax_top.set_ylabel(r"$\hat\tau_l(g)$", fontsize=18)
+            ax_bot.set_ylabel(r"$\hat\tau_l(g)$", fontsize=18)
+    
+        # x-label only on bottom row
+        if r == nrows_city - 1:
+            ax_bot.set_xlabel(r" $g$ ", fontsize=18)
+    # -------------------------------------------------------------------
+    # Hide unused cells
+    # -------------------------------------------------------------------
+    n_total_cells = nrows_city * ncols_city
+    for idx in range(n_city, n_total_cells):
+        r = idx // ncols_city
+        c = idx % ncols_city
+        ax_dummy = fig.add_subplot(outer[r, c])
+        ax_dummy.axis("off")
+    
+    # -------------------------------------------------------------------
+    # Global legend
+    # -------------------------------------------------------------------
+    legend_handles = [
+        Line2D(
+            [0], [0],
+            color=KN_COLORS[kn],
+            lw=4.0 if i == 0 else 2.0,
+            ls=KN_LS[kn],
+            label=KN_LABEL[kn]
+        )
+        for i, kn in enumerate(KN_VALUES)
+    ]
+    
+    fig.legend(
+        handles=legend_handles,
+        loc="upper right",
+        fontsize=18,
+        frameon=False,
+    )
+    if save:
+        save_folder = "Dun"
+        os.makedirs(save_folder, exist_ok=True)
+        path = os.path.join(save_folder, "dun.png")
+        plt.savefig(path, dpi=300, bbox_inches="tight")
+        print(f"Figure Dun saved to {path}")
+    plt.show()
+
+
+    
+### Figure S.5 ###
 def plot_theta_city(df_thetaci, city, legend =True, save =False):
     dfc = df_thetaci[df_thetaci["city"] == city].copy()
     dfc = dfc.sort_values(["frac", "period"])
@@ -1378,7 +1632,9 @@ boot_res.to_parquet("emp_bootstrap.parquet")
 ### Read the bootstrap result directly.
 boot_res = pd.read_parquet("emp_bootstrap.parquet")
 
-### Make plot S.4: the confidence bands for theta for each city
+### Make plot S.3: the empirical condition D(u_n) check
+plot_dun(df_all,City)
+### Make plot S.5: the confidence bands for theta for each city
 df_thetaci = fProcessTheta(boot_res)
 df_thetaci = df_thetaci[(df_thetaci['p_S']==97) & (df_thetaci['alpha']==0.1)] # p_S does not matter here, choose random one, 90% level of confidence interval, aloha =0.1
 plot_theta_city(df_thetaci, 'London', save = False)
