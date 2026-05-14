@@ -19,7 +19,7 @@ dataset is not recommended, as it is time-consuming and results in a very large 
 - Simulation_SupplementS3.py: Python script used to reproduce the Monte Carlo study in the Section S3 of the online supplement. 
     
 
-This version: January 7, 2026
+This version: May 14, 2026
 
 
 Copyright: Juan-Juan Cai, Yicong Lin, Julia Schaumburg and Chenhui Wang
