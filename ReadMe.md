@@ -1,4 +1,4 @@
-# Codes and datasets to replicate the results presented in the paper: Estimation and inference for the persistence of extremely high temperatures
+# Code and datasets for  "Estimation and inference for the persistence of extremely high temperatures"
 <!-- badges: start -->
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 <!-- badges: end -->
