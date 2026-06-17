@@ -1,0 +1,20 @@
+# Install:  pip install -r requirements.txt
+#
+# ---- Required to run the analysis scripts ----
+scipy==1.17.1
+pandas==3.0.2
+matplotlib==3.10.8
+seaborn==0.13.2
+statsmodels==0.14.6
+joblib==1.5.3
+pyarrow==24.0.0          # read data/processed/emp_bootstrap.parquet
+cartopy==0.25.0          # Figure 2 (left): station map.
+                         #   Needs system libraries GEOS and PROJ, and downloads
+                         #   Natural Earth shapefiles on first use (internet).
+                         #   Debian/Ubuntu: apt-get install libgeos-dev libproj-dev
+#
+# ---- Data-construction ONLY: code/00_build_dataset.py (not needed to reproduce results) ----
+# xarray==2025.9.0
+# cfgrib==0.9.15.0        # plus the ecCodes system library (eccodes)
+# cdsapi==0.7.6           # plus a ~/.cdsapirc file with your Copernicus CDS API key
+# certifi                 # TLS certificates for the CDS download
