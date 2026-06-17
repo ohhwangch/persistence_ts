@@ -1,7 +1,11 @@
 
 
 # Estimation and inference for the persistence of extremely high temperatures: README for the Replication Package
-Juan-Juan Cai, Yicong Lin, Julia Schaumburg, Chenhui Wang
+<!-- badges: start -->
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+<!-- badges: end -->
+
+Authors: Juan-Juan Cai (j.cai@vu.nl, Vrije Universiteit Amsterdam & Tinbergen Institute) , Yicong Lin (yc.lin@vu.nl, Vrije Universiteit Amsterdam & Tinbergen Institute), Julia Schaumburg (j.schaumburg@vu.nl, Vrije Universiteit Amsterdam & Tinbergen Institute) and Chenhui Wang (c.h.wang@vu.nl, Vrije Universiteit Amsterdam)
 
 ## Overview
 This replication package contains Python code and data for reproducing the main simulation results, the empirical application, and the online supplement for the paper. The package is organized as follows:
